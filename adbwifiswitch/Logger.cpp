@@ -1,8 +1,9 @@
-#include <stdarg.h>
-#include <stdio.h>
 #include <unistd.h>
 
+#include <cstdarg>
+#include <cstdio>
 #include <cstring>
+
 #include "Logger.h"
 
 Logger::Logger(const std::string &tag)

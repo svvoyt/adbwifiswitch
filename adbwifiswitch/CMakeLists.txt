@@ -8,6 +8,7 @@ SET(CXX_STANDARD_REQUIRED ON)
 SET( SRCS_LIST
 AdbController.cpp
 AdbTask.cpp
+Buffers.cpp
 ChildProcess.cpp
 Config.cpp
 FileHandler.cpp
@@ -19,6 +20,7 @@ main.cpp
 SET( HDRS_LIST
 AdbController.h
 AdbTask.h
+Buffers.h
 ChildProcess.h
 Config.h
 FileHandler.h

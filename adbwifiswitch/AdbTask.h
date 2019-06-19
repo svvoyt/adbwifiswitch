@@ -1,11 +1,21 @@
 #ifndef ADBTASK_H
 #define ADBTASK_H
 
+#include <memory>
 
-class AdbTask
-{
+class FileHandler;
+class AdbTask;
+
+
+class AdbTask {
 public:
-    AdbTask();
+    enum Res {
+        Next, Continue, Fail
+    };
+    
+//    AdbTask( AdbTaskContext &ctx );
+    virtual Res onStderrData();
+    virtual Res onStdoutData();
 };
 
 #endif // ADBTASK_H
