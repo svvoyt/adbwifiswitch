@@ -6,6 +6,7 @@ SET(CXX_STANDARD 11)
 SET(CXX_STANDARD_REQUIRED ON)
 
 SET( SRCS_LIST
+AdbContext.cpp
 AdbController.cpp
 AdbTask.cpp
 Buffers.cpp
@@ -18,6 +19,7 @@ main.cpp
 )
 
 SET( HDRS_LIST
+AdbContext.h
 AdbController.h
 AdbTask.h
 Buffers.h

@@ -63,6 +63,11 @@ bool FileHandler::setTimer(unsigned int timerId, std::chrono::milliseconds ms)
     return true;
 }
 
+void FileHandler::setWriteRequest(bool enable)
+{
+    setFlag( Flags::fPollOut, enable);
+}
+
 
 // FileHandler:: private methods
 
