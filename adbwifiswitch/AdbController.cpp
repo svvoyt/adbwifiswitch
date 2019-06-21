@@ -25,6 +25,7 @@ public:
         if (m_curr < 0) m_curr = 0; else m_curr++;
         switch (m_curr) {
             case TaskDef::WaitPrompt:
+                return std::make_shared<AdbTaskWaitFirstPrompt>( ctx() );
             case TaskDef::LaunchActivity:
             case TaskDef::GetResult:
             default:
@@ -47,14 +48,54 @@ private:
     };
     
 };
+
+class DisconnectScript : public Script {
+public:
+    using Script::Script;
+    
+    virtual std::shared_ptr<AdbTask> getNextTask() override
+    {
+        assert( hasNext() );
+        if (m_curr < 0) m_curr = 0; else m_curr++;
+        switch (m_curr) {
+            case TaskDef::WaitPrompt:
+                return std::make_shared<AdbTaskWaitFirstPrompt>( ctx() );
+            case TaskDef::LaunchActivity:
+            case TaskDef::GetResult:
+            default:
+                assert(false);
+        }
+        return std::shared_ptr<AdbTask>();
+    }
+
+    virtual bool hasNext() const override {
+        return m_curr < (TaskCount-1);
+    }
+    
+    
+private:
+    enum TaskDef {
+        WaitPrompt,
+        LaunchActivity,
+        GetResult,
+        TaskCount
+    };
+    
+};
+
 }
 
 
 AdbController::AdbController(std::shared_ptr<Config> cfg, FilePoller &fpoll)
-    : m_adbCtx(cfg), m_adbProc(ChildProcess::Flags::fDefault | ChildProcess::Flags::fStdErr), 
+    : m_adbCtx(*this, cfg), m_adbProc(ChildProcess::Flags::fDefault | ChildProcess::Flags::fStdErr), 
       m_fpoll(fpoll)
 {
     
+}
+
+AdbController::~AdbController()
+{
+    cleanup();
 }
 
 bool AdbController::connectWiFi()
@@ -63,7 +104,21 @@ bool AdbController::connectWiFi()
     
     if (!init()) return false;
     m_script = std::make_shared<ConnectScript>( std::shared_ptr<AdbContext>(&m_adbCtx, StaticContextDeleter() ) );
-    return true;
+    return switchTask( AdbTask::Res::Next );
+}
+
+bool AdbController::disconnectWiFi()
+{
+    LOGD(true, "disconnectWiFi()");
+    
+    if (!init()) return false;
+    m_script = std::make_shared<DisconnectScript>( std::shared_ptr<AdbContext>(&m_adbCtx, StaticContextDeleter() ) );
+    return switchTask( AdbTask::Res::Next );
+}
+
+int AdbController::exitCode() const
+{
+    return m_script && !m_script->hasNext() ? 0 : 1;
 }
 
 
@@ -95,6 +150,22 @@ inline void AdbController::foreachFh(std::function<void(AdbController::FHCommon 
                      static_cast<FHCommon *>(m_adbStderr.get())} ) {
         if (fptr) proc( fptr );
     }
+}
+
+inline FileHandler *AdbController::getFH(AdbContext::FStream fstream)
+{
+    switch (fstream) {
+        case AdbContext::FStream::fsStdIn:
+            return m_adbStdin.get();
+        case AdbContext::FStream::fsStdOut:
+            return m_adbStdout.get();
+        case AdbContext::FStream::fsStdErr:
+            return m_adbStderr.get();
+        default:
+            assert(false);
+            break;
+    }
+    return nullptr;
 }
 
 bool AdbController::init()
@@ -141,14 +212,18 @@ bool AdbController::switchTask(AdbTask::Res res)
             return true;
 
         case AdbTask::Res::Next:
+            if (m_currTask) m_currTask->cleanup();
             break;
     }
     
     if (m_script->hasNext()) {
         m_currTask = m_script->getNextTask();
         assert(m_currTask);
-    } else 
-        cleanup();
+        if (!m_currTask->start()) {
+            cleanup();
+            return false;
+        }
+    }
     
     return true;
 }
@@ -160,6 +235,51 @@ AdbController::FHCommon::FHCommon(AdbController &owner, int fd)
     : FileHandler( fd ), m_owner(owner)
 {
     
+}
+
+bool AdbController::FHCommon::onError()
+{
+    LOG(true, "onError() fs:%d", static_cast<int>(getFH()));
+    return m_owner.switchTask( AdbTask::Res::Fail );
+}
+
+bool AdbController::FHCommon::onReadyToRead()
+{
+    const auto fstream = getFH();
+    LOGD(true, "onReadyToRead() fs:%d", static_cast<int>(fstream));
+
+    auto read_sz = Read();
+    if (read_sz > 0) {
+#ifndef NDEBUG
+        std::string s(m_readBuf.head(), m_readBuf.filledSize());
+        LOGD(true, "Read str: %s", s.c_str());
+#endif
+    } else {
+        LOG(read_sz == 0, "zero read");
+        return m_owner.switchTask( AdbTask::Res::Fail );
+    }
+
+    assert(!m_readBuf.empty());
+    std::size_t sz = m_readBuf.filledSize();
+    auto res = m_owner.m_currTask->onDataReady( fstream, m_readBuf.head(), sz );
+    if (res != AdbTask::Res::Fail) {
+        m_readBuf.cut( sz );
+    }
+    return m_owner.switchTask( res );
+}
+
+bool AdbController::FHCommon::onReadyToWrite()
+{
+    LOGD(true, "onReadyToWrite() fs:%d unhandled", static_cast<int>(getFH()));
+    assert( false );
+    return m_owner.switchTask( AdbTask::Res::Fail );
+}
+
+bool AdbController::FHCommon::onTimer(unsigned int timerId)
+{
+    const auto fstream = getFH();
+    LOGD(true, "Stream %d onTimer() %u", static_cast<int>(fstream), timerId);
+    return m_owner.switchTask( m_owner.m_currTask->onTimer( fstream, timerId ) );
 }
 
 long AdbController::FHCommon::Read(std::size_t max)
@@ -194,38 +314,6 @@ long AdbController::FHCommon::Write(const void *ptr, std::size_t size)
     return ret;
 }
 
-bool AdbController::FHCommon::readData(ReadBuffer &rbuf, AdbTask::HandlerType handler)
-{
-    auto read_sz = Read();
-    if (read_sz > 0) {
-#ifndef NDEBUG
-        std::string s(m_readBuf.head(), m_readBuf.filledSize());
-        LOGD(true, "Read str: %s", s.c_str());
-#endif
-    } else {
-        LOG(read_sz == 0, "zero read");
-        return m_owner.switchTask( AdbTask::Res::Fail );
-    }
-
-    assert(!rbuf.empty());
-    std::size_t sz = rbuf.filledSize();
-    std::string out;
-    auto res = handler( rbuf.head(), sz, out );
-    if (res != AdbTask::Res::Fail) {
-        rbuf.cut( sz );
-        if (!out.empty()) {
-            if (!m_owner.m_adbStdin->put( out )) res = AdbTask::Res::Fail;
-        }
-    }
-    return m_owner.switchTask( res );
-}
-
-bool AdbController::FHStdIn::onTimer(unsigned int timerId)
-{
-    LOGD(true, "stdin onTimer() %u", timerId);
-    return m_owner.switchTask( AdbTask::Res::Fail );
-}
-
 bool AdbController::FHStdIn::onReadyToRead()
 {
     LOGI(true, "Adb's stdin: onReadyToRead()");
@@ -248,65 +336,50 @@ bool AdbController::FHStdIn::onReadyToWrite()
     return true;
 }
 
-bool AdbController::FHStdIn::onError()
+AdbContext::FStream AdbController::FHStdIn::getFH() const
 {
-    LOG(true, "Error condition on stdin");
-    return m_owner.switchTask( AdbTask::Res::Fail );
+    return AdbContext::FStream::fsStdIn;
 }
 
 bool AdbController::FHStdIn::put(const std::string &data)
 {
-    m_writeBuf.append( data.data(), data.size() );
+    return put( data.data(), data.size() );
+}
+
+bool AdbController::FHStdIn::put(const void *buf, std::size_t size)
+{
+    m_writeBuf.append( buf, size );
     setWriteRequest( true );
     return true;
 }
 
-bool AdbController::FHStdOut::onTimer(unsigned int timerId)
+AdbContext::FStream AdbController::FHStdOut::getFH() const
 {
-    LOGD(true, "stdout onTimer() %u", timerId);
-    return m_owner.switchTask( AdbTask::Res::Fail );
+    return AdbContext::FStream::fsStdOut;
 }
 
-bool AdbController::FHStdOut::onReadyToRead()
+AdbContext::FStream AdbController::FHStdErr::getFH() const
 {
-    LOGD(true, "FHStdOut::onReadyToRead()");
-    return readData( m_readBuf, std::bind(&AdbTask::onStderrData, m_owner.m_currTask.get(),
-                                          std::placeholders::_1, std::placeholders::_2, std::placeholders::_3) );
+    return AdbContext::FStream::fsStdErr;
 }
 
-bool AdbController::FHStdOut::onReadyToWrite()
+
+// AdbController::Context class implementation
+
+AdbController::Context::Context(AdbController &owner, std::shared_ptr<Config> cfg)
+    : AdbContext(std::move(cfg)), m_owner(owner)
 {
-    assert( false );
-    return m_owner.switchTask( AdbTask::Res::Fail );
+    
 }
 
-bool AdbController::FHStdOut::onError()
+bool AdbController::Context::writeStdIn(const void *buf, std::size_t size)
 {
-    LOG(true, "Error condition on stdout");
-    return m_owner.switchTask( AdbTask::Res::Fail );
+    return m_owner.m_adbStdin->put( buf, size );
 }
 
-bool AdbController::FHStdErr::onTimer(unsigned int timerId)
+bool AdbController::Context::timerCtl(AdbContext::FStream fstream, unsigned int timerId, bool start, std::chrono::milliseconds ms)
 {
-    LOGD(true, "stderr onTimer() %u", timerId);
-    return m_owner.switchTask( AdbTask::Res::Fail );
-}
-
-bool AdbController::FHStdErr::onReadyToRead()
-{
-    LOGD(true, "FHStdErr::onReadyToRead()");
-    return readData( m_readBuf, std::bind(&AdbTask::onStderrData, m_owner.m_currTask.get(),
-                                          std::placeholders::_1, std::placeholders::_2, std::placeholders::_3) );
-}
-
-bool AdbController::FHStdErr::onReadyToWrite()
-{
-    assert( false );
-    return m_owner.switchTask( AdbTask::Res::Fail );
-}
-
-bool AdbController::FHStdErr::onError()
-{
-    LOG(true, "Error condition on stderr");
-    return m_owner.switchTask( AdbTask::Res::Fail );
+    FileHandler *fh = m_owner.getFH( fstream );
+    assert( fh );
+    return start ? fh->startTimer( timerId, ms ) : fh->stopTimer( timerId );
 }

@@ -55,12 +55,21 @@ void FileHandler::setState(bool enable)
     setFlag( fState, enable );
 }
 
-bool FileHandler::setTimer(unsigned int timerId, std::chrono::milliseconds ms)
+bool FileHandler::startTimer(unsigned int timerId, std::chrono::milliseconds ms, bool reset_prev)
 {
     auto now = std::chrono::steady_clock::now() + ms;
 
+    if (reset_prev) stopTimer( timerId );
     m_timers.emplace( now, timerId );
     return true;
+}
+
+bool FileHandler::stopTimer(unsigned int timerId)
+{
+    for(auto it = m_timers.begin(); it != m_timers.end(); ) {
+        if (it->second == timerId) it = m_timers.erase( it );
+        else ++it;
+    }
 }
 
 void FileHandler::setWriteRequest(bool enable)

@@ -78,7 +78,7 @@ void ReadBuffer::addFilled(std::size_t size)
 
 // WriteBuffer class implementation
 
-WriteBuffer &WriteBuffer::append(const char *buf, size_t size, bool trim)
+WriteBuffer &WriteBuffer::append(const void *buf, size_t size, bool trim)
 {
     reserve( size, trim );
     memcpy( endPtr(), buf, size );

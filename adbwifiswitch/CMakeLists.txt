@@ -2,9 +2,6 @@ cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
 
 project(adbwifiswitch)
 
-SET(CXX_STANDARD 11)
-SET(CXX_STANDARD_REQUIRED ON)
-
 SET( SRCS_LIST
 AdbContext.cpp
 AdbController.cpp
@@ -35,3 +32,9 @@ add_executable(${PROJECT_NAME}
     ${SRCS_LIST}
     ${HDRS_LIST}
     )
+
+set_target_properties(adbwifiswitch PROPERTIES
+    CXX_STANDARD 17
+    CXX_EXTENSIONS OFF
+)
+

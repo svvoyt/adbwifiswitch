@@ -18,9 +18,11 @@ class AdbController
 {
 public:
     AdbController(std::shared_ptr<Config> cfg, FilePoller &fpoll);
+    ~AdbController();
 
     bool connectWiFi();
     bool disconnectWiFi();
+    int exitCode() const;
     
 private:
     enum Mode {
@@ -38,13 +40,18 @@ private:
     public:
         FHCommon(AdbController &owner, int fd);
 
+        virtual AdbContext::FStream getFH() const = 0;
+
+        virtual bool onError() override;
+        virtual bool onReadyToRead() override;
+        virtual bool onReadyToWrite() override;
+        virtual bool onTimer( unsigned int timerId ) override;
+
         FilePoller::HandlerId handlerId;
         
     protected:
         long Read(std::size_t max = 10*1024);
         long Write(const void *ptr, std::size_t size);
-        
-        bool readData(ReadBuffer &rbuf, AdbTask::HandlerType handler);
         
         ReadBuffer m_readBuf;
         AdbController &m_owner;
@@ -54,12 +61,12 @@ private:
     public:
         using FHCommon::FHCommon;
 
-        virtual bool onTimer( unsigned int timerId ) override;
         virtual bool onReadyToRead() override;
         virtual bool onReadyToWrite() override;
-        virtual bool onError() override;
+        virtual AdbContext::FStream getFH() const override;
 
         bool put(const std::string &data);
+        bool put(const void *, std::size_t size);
         
     private:
         WriteBuffer m_writeBuf;
@@ -68,29 +75,33 @@ private:
     class FHStdOut : public FHCommon {
     public:
         using FHCommon::FHCommon;
-
-        virtual bool onTimer( unsigned int timerId ) override;
-        virtual bool onReadyToRead() override;
-        virtual bool onReadyToWrite() override;
-        virtual bool onError() override;
+        virtual AdbContext::FStream getFH() const override;
     };
     
     class FHStdErr : public FHCommon {
     public:
         using FHCommon::FHCommon;
+        virtual AdbContext::FStream getFH() const override;
+    };
+    
+    class Context : public AdbContext {
+    public:
+        Context(AdbController &owner, std::shared_ptr<Config> cfg);
 
-        virtual bool onTimer( unsigned int timerId ) override;
-        virtual bool onReadyToRead() override;
-        virtual bool onReadyToWrite() override;
-        virtual bool onError() override;
+        virtual bool writeStdIn(const void *buf, std::size_t size) override;
+        virtual bool timerCtl(FStream fstream, unsigned int timerId, bool start,
+                              std::chrono::milliseconds ms=std::chrono::milliseconds::zero()) override;
+    private:
+        AdbController &m_owner;
     };
     
     void cleanup();
     void foreachFh( std::function<void(FHCommon *)> proc );
+    FileHandler *getFH(AdbContext::FStream fstream);
     bool init();
     bool switchTask( AdbTask::Res res );
     
-    AdbContext m_adbCtx;
+    Context m_adbCtx;
     ChildProcess m_adbProc;
     std::shared_ptr<FHStdIn> m_adbStdin;
     std::shared_ptr<FHStdOut> m_adbStdout;

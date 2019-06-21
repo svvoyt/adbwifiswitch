@@ -36,7 +36,7 @@ class WriteBuffer : public BufferBase {
 public:
     using BufferBase::BufferBase;
 
-    WriteBuffer &append(const char *buf, size_t size, bool trim = false);
+    WriteBuffer &append(const void *buf, size_t size, bool trim = false);
     const void *ptr() const {return reinterpret_cast<const void *>( headPtr() );}
     void pushHead(std::size_t size, bool trim = false) {cut( size, trim );}
     std::size_t size() const {return m_filled;}

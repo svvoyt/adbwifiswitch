@@ -6,3 +6,5 @@ AdbContext::AdbContext(std::shared_ptr<Config> cfg)
 {
 }
 
+AdbContext::~AdbContext() = default;
+

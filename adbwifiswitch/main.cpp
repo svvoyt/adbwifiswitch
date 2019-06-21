@@ -5,10 +5,13 @@
 #include <unistd.h>
 
 #include <array>
+#include <cassert>
 #include <string>
 #include <sstream>
 
+#include "AdbController.h"
 #include "Config.h"
+#include "FilePoller.h"
 #include "Logger.h"
 
 enum RunMode {
@@ -161,6 +164,15 @@ bool parseClArgs(int argc, char** argv, Config &cfg, RunMode &rmode)
     return true;
 }
 
+namespace {
+
+class StaticConfigDeleter {
+public:
+    void operator()(Config *) {}
+};
+
+}
+
 int main(int argc, char** argv)
 {
     Config cfg;
@@ -171,9 +183,23 @@ int main(int argc, char** argv)
     if (rmode == RunMode::Help)
         return 0;
 
-    std::string s("Hello %s");
-    LOGD(true, s, "World!");
-    LOGD(true, s.c_str(), "World2!");
-
-    return 0;
+    bool run = false;
+    FilePoller fpoll;
+    AdbController adb(std::shared_ptr<Config>(&cfg, StaticConfigDeleter()), fpoll);
+    
+    switch (rmode) {
+        case RunMode::Connect:
+            run = adb.connectWiFi();
+            break;
+        case RunMode::Disconnect:
+            run = adb.disconnectWiFi();
+            break;
+        default:
+            assert( false );
+    }
+    
+    if (run)
+        fpoll.exec();
+    
+    return run ? adb.exitCode() : 255;
 }

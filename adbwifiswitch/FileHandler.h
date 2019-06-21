@@ -16,7 +16,8 @@ public:
     bool isEnabled() const;
     bool writeRequired() const;
     void setState( bool enable );
-    bool setTimer(unsigned int timerId, std::chrono::milliseconds ms);
+    bool startTimer(unsigned int timerId, std::chrono::milliseconds ms, bool reset_prev = true);
+    bool stopTimer(unsigned int timerId);
     void setWriteRequest(bool enable);
 
     virtual bool onTimer( unsigned int timerId ) {return false;}

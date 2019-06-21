@@ -18,6 +18,7 @@ public:
     FilePoller(bool single_threaded = true);
 
     HandlerId addHandler( std::shared_ptr<FileHandler> handler);
+    void exec();
     bool pollHandlers(std::chrono::milliseconds timeout);
     void removeHandler( HandlerId hndId );
 

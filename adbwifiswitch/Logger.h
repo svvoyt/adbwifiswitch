@@ -44,4 +44,10 @@ private:
 #define LOGD(c, format, ...) LOG_GEN( (c), LOG_DEBUG, format, ##__VA_ARGS__)
 #define LOG(c, format, ...) LOGE( (c), format, ##__VA_ARGS__)
 
+#ifndef NDEBUG
+#define LDEB(c, format, ...) (void (0))
+#else
+#define LDEB(c, format, ...) LOGD(c, format, ##__VA_ARGS__)
+#endif
+
 #endif // LOGGER_H

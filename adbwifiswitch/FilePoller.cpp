@@ -21,6 +21,13 @@ FilePoller::HandlerId FilePoller::addHandler(std::shared_ptr<FileHandler> handle
     return seq;
 }
 
+void FilePoller::exec()
+{
+    std::vector<pollfd> pfd;
+    std::vector<FilePoller::HandlerId> ind;
+    while( pollHandlers(std::chrono::milliseconds::max(), pfd, ind) );
+}
+
 bool FilePoller::pollHandlers(std::chrono::milliseconds timeout)
 {
     std::vector<pollfd> pfd;

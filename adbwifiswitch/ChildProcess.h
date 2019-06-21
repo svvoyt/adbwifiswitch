@@ -17,6 +17,7 @@ public:
     };
 
     ChildProcess(int flags = Flags::fDefault);
+    ChildProcess(const ChildProcess &) = delete;
     ~ChildProcess();
 
     void cleanup(bool force_stop = false, int signal = 0);
