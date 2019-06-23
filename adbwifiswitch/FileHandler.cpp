@@ -29,7 +29,10 @@ void FileHandler::checkTimer(std::chrono::steady_clock::time_point now)
         auto it = m_timers.cbegin();
         if (it == m_timers.cend() || it->first > now)
             break;
-        onTimer( it->second );
+
+        auto timerId = it->second;
+        m_timers.erase( it );
+        onTimer( timerId );
     }
 }
 

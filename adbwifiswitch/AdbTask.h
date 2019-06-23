@@ -38,6 +38,9 @@ public:
     virtual bool start() override;
     virtual Res onDataReady(AdbContext::FStream fstream, const char *input, std::size_t &size) override;
     virtual Res onTimer(AdbContext::FStream fstream, unsigned int timerId) override;
+
+private:
+    int m_foundTimes = 0;
 };
 
 #endif // ADBTASK_H

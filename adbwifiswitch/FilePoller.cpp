@@ -1,5 +1,6 @@
 
 #include <cassert>
+#include <iostream>
 
 #include "FilePoller.h"
 #include "Logger.h"
@@ -80,8 +81,10 @@ bool FilePoller::pollHandlers(std::chrono::milliseconds timeout,
         for(auto it = m_hndList.begin(); it != m_hndList.end();) {
             auto handler = it->second.lock();
             if (handler) {
-                if (!handler->isEnabled())
+                if (!handler->isEnabled()) {
+                    ++it;
                     continue;
+                }
 
                 struct pollfd spfd;
                 spfd.fd = handler->getFd();
@@ -100,15 +103,19 @@ bool FilePoller::pollHandlers(std::chrono::milliseconds timeout,
                 // timers
                 const auto timer = handler->getClosestTime();
                 const bool empty_timer = timer == timer.max();
-                bool use_timer = false;
                 if (!empty_timer) {
+                    bool use_timer = false;
                     if (timer <= now) {
                         use_timer = true;
                         timeout = timeout.zero();
                     } else if (timeout != timeout.zero()) {
-                            std::chrono::steady_clock::duration diff = now - timer;
+                        auto diff = std::chrono::duration_cast<decltype(timeout)>( timer - now );
+                        std::cerr << "now " << now.time_since_epoch().count() << " timer "
+                                  << timer.time_since_epoch().count()
+                                  << " diff " << diff.count()
+                                  << " curr timeout " << timeout.count() << std::endl;
                             if (diff < timeout) {
-                                timeout = std::chrono::duration_cast<decltype(timeout)>( diff );
+                                timeout = diff;
                                 use_timer = true;
                             }
                     }
@@ -124,7 +131,10 @@ bool FilePoller::pollHandlers(std::chrono::milliseconds timeout,
         }
     }
 
-    if (pfd.empty()) return true;
+    if (!fd_count) {
+        LOGD(true, "No more handlers to poll");
+        return false;
+    }
 
     int poll_timeo = timeout == timeout.max() ? -1 : static_cast<int>( timeout.count() );
 

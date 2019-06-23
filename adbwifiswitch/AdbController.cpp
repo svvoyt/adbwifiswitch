@@ -170,7 +170,7 @@ inline FileHandler *AdbController::getFH(AdbContext::FStream fstream)
 
 bool AdbController::init()
 {
-    if (!m_adbProc.exec( m_adbCtx.config()->getAdbCmd(), "" )) {
+    if (!m_adbProc.exec( m_adbCtx.config()->getAdbCmd(), "shell" )) {
         LOG(true, "Can't spawn %s", m_adbCtx.config()->getAdbCmd().c_str());
         return false;
     }
@@ -195,6 +195,10 @@ bool AdbController::init()
         return false;
     }
     
+    m_adbStdin->setState( true );
+    m_adbStdout->setState( true );
+    m_adbStderr->setState( true );
+
     return true;
 }
 
@@ -289,6 +293,7 @@ long AdbController::FHCommon::Read(std::size_t max)
         std::size_t rest = m_readBuf.restSize();
         if (rest == 0) {
             rest = (((2*total) >> 10) + 1) << 10;
+            m_readBuf.reserve( rest, true );
         }
         long ret = read(getFd(), m_readBuf.readPtr(), rest );
         if (ret < 0) {

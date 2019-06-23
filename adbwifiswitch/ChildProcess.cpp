@@ -99,7 +99,10 @@ bool ChildProcess::exec(const std::string &cmd, const std::string cl_params)
         for(std::size_t j=PIPE_STDIN; j <= (with_stderr ? PIPE_STDERR : PIPE_STDOUT); j++ )
             for(auto i = 0; i < 2; i++) close( pipes[j][i] );
 
-        nResult = execlp(cmd.c_str(), cl_params.c_str(), nullptr);
+        const int sberr = setvbuf( stdout, nullptr, _IONBF, 0 );
+        LOGE(sberr != 0, "setbuf() failed: %d errno %d", sberr, errno);
+
+        nResult = execlp(cmd.c_str(), cmd.c_str(), cl_params.c_str(), nullptr);
 
         LOGE(true, "Exec() error. Result %d ", nResult);
 

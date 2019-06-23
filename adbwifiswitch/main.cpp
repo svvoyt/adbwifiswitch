@@ -180,6 +180,10 @@ int main(int argc, char** argv)
     if (!parseClArgs( argc, argv, cfg, rmode ))
         return 1;
 
+#ifndef NDEBUG
+    Logger::instance().verbose(true);
+#endif
+
     if (rmode == RunMode::Help)
         return 0;
 
