@@ -24,10 +24,9 @@ public:
         assert( hasNext() );
         if (m_curr < 0) m_curr = 0; else m_curr++;
         switch (m_curr) {
-            case TaskDef::WaitPrompt:
-                return std::make_shared<AdbTaskWaitFirstPrompt>( ctx() );
-            case TaskDef::LaunchActivity:
-            case TaskDef::GetResult:
+            case TaskDef::RunConnect:
+                return std::make_shared<AdbTaskRunConnect>( ctx() );
+            case TaskDef::WaitConnectLog:
             default:
                 assert(false);
         }
@@ -41,9 +40,8 @@ public:
     
 private:
     enum TaskDef {
-        WaitPrompt,
-        LaunchActivity,
-        GetResult,
+        RunConnect,
+        WaitConnectLog,
         TaskCount
     };
     
@@ -58,10 +56,9 @@ public:
         assert( hasNext() );
         if (m_curr < 0) m_curr = 0; else m_curr++;
         switch (m_curr) {
-            case TaskDef::WaitPrompt:
-                return std::make_shared<AdbTaskWaitFirstPrompt>( ctx() );
-            case TaskDef::LaunchActivity:
-            case TaskDef::GetResult:
+            case TaskDef::RunDisconnect:
+                return std::make_shared<AdbTaskRunDisconnect>( ctx() );
+            case TaskDef::WaitDisconnectLog:
             default:
                 assert(false);
         }
@@ -75,9 +72,8 @@ public:
     
 private:
     enum TaskDef {
-        WaitPrompt,
-        LaunchActivity,
-        GetResult,
+        RunDisconnect,
+        WaitDisconnectLog,
         TaskCount
     };
     
@@ -101,8 +97,7 @@ AdbController::~AdbController()
 bool AdbController::connectWiFi()
 {
     LOGD(true, "connectWiFi()");
-    
-    if (!init()) return false;
+
     m_script = std::make_shared<ConnectScript>( std::shared_ptr<AdbContext>(&m_adbCtx, StaticContextDeleter() ) );
     return switchTask( AdbTask::Res::Next );
 }
@@ -110,8 +105,7 @@ bool AdbController::connectWiFi()
 bool AdbController::disconnectWiFi()
 {
     LOGD(true, "disconnectWiFi()");
-    
-    if (!init()) return false;
+        
     m_script = std::make_shared<DisconnectScript>( std::shared_ptr<AdbContext>(&m_adbCtx, StaticContextDeleter() ) );
     return switchTask( AdbTask::Res::Next );
 }
@@ -168,9 +162,11 @@ inline FileHandler *AdbController::getFH(AdbContext::FStream fstream)
     return nullptr;
 }
 
-bool AdbController::init()
+bool AdbController::initAdb(const std::list<std::string> &cl_params)
 {
-    if (!m_adbProc.exec( m_adbCtx.config()->getAdbCmd(), "shell" )) {
+    m_adbProc.cleanup();
+    
+    if (!m_adbProc.exec( m_adbCtx.config()->getAdbCmd(), cl_params )) {
         LOG(true, "Can't spawn %s", m_adbCtx.config()->getAdbCmd().c_str());
         return false;
     }
@@ -258,12 +254,12 @@ bool AdbController::FHCommon::onReadyToRead()
         std::string s(m_readBuf.head(), m_readBuf.filledSize());
         LOGD(true, "Read str: %s", s.c_str());
 #endif
+        LOGE( this == m_owner.m_adbStderr.get(), "AdbErr: %s", s.c_str() );
     } else {
-        LOG(read_sz == 0, "zero read");
-        return m_owner.switchTask( AdbTask::Res::Fail );
+        LOGD(read_sz == 0, "zero read");
+//        return m_owner.switchTask( AdbTask::Res::Fail );
     }
 
-    assert(!m_readBuf.empty());
     std::size_t sz = m_readBuf.filledSize();
     auto res = m_owner.m_currTask->onDataReady( fstream, m_readBuf.head(), sz );
     if (res != AdbTask::Res::Fail) {
@@ -375,6 +371,11 @@ AdbController::Context::Context(AdbController &owner, std::shared_ptr<Config> cf
     : AdbContext(std::move(cfg)), m_owner(owner)
 {
     
+}
+
+bool AdbController::Context::startAdb(const std::list<std::string> &cl)
+{
+    return m_owner.initAdb( cl );
 }
 
 bool AdbController::Context::writeStdIn(const void *buf, std::size_t size)

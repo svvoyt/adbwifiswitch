@@ -6,6 +6,7 @@
 #include <array>
 #include <cassert>
 #include <thread>
+#include <vector>
 
 #include "Logger.h"
 #include "ChildProcess.h"
@@ -45,7 +46,7 @@ void ChildProcess::cleanup(bool force_stop, int signal)
     }
 }
 
-bool ChildProcess::exec(const std::string &cmd, const std::string cl_params)
+bool ChildProcess::exec(const std::string &cmd, const std::list<std::string> &cl_params)
 {
     std::array<int[2], 3> pipes;
     int child_pid;
@@ -99,10 +100,16 @@ bool ChildProcess::exec(const std::string &cmd, const std::string cl_params)
         for(std::size_t j=PIPE_STDIN; j <= (with_stderr ? PIPE_STDERR : PIPE_STDOUT); j++ )
             for(auto i = 0; i < 2; i++) close( pipes[j][i] );
 
-        const int sberr = setvbuf( stdout, nullptr, _IONBF, 0 );
-        LOGE(sberr != 0, "setbuf() failed: %d errno %d", sberr, errno);
-
-        nResult = execlp(cmd.c_str(), cmd.c_str(), cl_params.c_str(), nullptr);
+        const std::size_t argc = cl_params.size();
+        std::vector<char *> argvref;
+        std::vector<std::vector<char> > argv;
+        argv.emplace_back( std::vector<char>( cmd.begin(), cmd.end() ) );
+        std::size_t i = 1;
+        for(auto &str : cl_params) argv.emplace_back( std::vector<char>( str.begin(), str.end() ) );
+        for(auto &v : argv) argvref.push_back( v.data() );
+        argvref.push_back( nullptr );
+        
+        nResult = execvp(cmd.c_str(), argvref.data());
 
         LOGE(true, "Exec() error. Result %d ", nResult);
 

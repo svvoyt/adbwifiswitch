@@ -2,7 +2,9 @@
 #define ADBCONTEXT_H
 
 #include <chrono>
+#include <list>
 #include <memory>
+#include <string>
 
 
 class Config;
@@ -20,6 +22,7 @@ public:
     const Config *config() const {return m_config.get();}
     std::shared_ptr<Config> configShared() {return m_config;}
     
+    virtual bool startAdb(const std::list<std::string> &cl) = 0;
     virtual bool writeStdIn(const void *buf, std::size_t size) = 0;
     virtual bool timerCtl(FStream fstream, unsigned int timerId, bool start,
                           std::chrono::milliseconds ms=std::chrono::milliseconds::zero()) = 0;

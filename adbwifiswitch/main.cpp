@@ -6,6 +6,7 @@
 
 #include <array>
 #include <cassert>
+#include <cstring>
 #include <string>
 #include <sstream>
 
@@ -18,8 +19,14 @@ enum RunMode {
     None, Help, Connect, Disconnect
 };
 
-static const std::array<const char * const, 2> AuthTypes({"WEP", "WSA"});
+static const std::array<const char * const, 2> AuthTypes({"WEP", "WPA"});
 static const char *AdbCmdDefault = "adb";
+
+const char *getPname(const char *argv0)
+{
+    auto p = strrchr( argv0, '/' );
+    return p ? p+1 : argv0;
+}
 
 void usage(char *pname)
 {
@@ -30,14 +37,15 @@ void usage(char *pname)
         ss << atype;
     }
 
+    auto cpname = getPname( pname );
     fprintf(stderr, "Usage:\n%s -s|--ssid <SSID> -k|--key <security key>\n"
                     "\t- connect to WiFi AP\n"
                     "%s -d|--disconnect\n\t- disconnect from AP\n"
                     "Optional switches:\n"
                     " -a|--adbcmd=<adb command>, default is \"adb\"\n"
                     " -h|--help - print usage\n"
-                    " -t|--type <%s>, default is WSA\n"
-                    " -v|--verbose - noisy logging", pname, pname, ss.str().c_str());
+                    " -t|--type <%s>, default is WPA\n"
+                    " -v|--verbose - noisy logging", cpname, cpname, ss.str().c_str());
 }
 
 __attribute__((__format__ (__printf__, 2, 3)))
@@ -177,11 +185,13 @@ int main(int argc, char** argv)
 {
     Config cfg;
     RunMode rmode;
+    
+    Logger::instance().setTag( getPname(*argv) );
     if (!parseClArgs( argc, argv, cfg, rmode ))
         return 1;
 
 #ifndef NDEBUG
-    Logger::instance().verbose(true);
+//    Logger::instance().verbose(true);
 #endif
 
     if (rmode == RunMode::Help)

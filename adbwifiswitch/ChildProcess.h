@@ -1,6 +1,7 @@
 #ifndef CHILDPROCESS_H
 #define CHILDPROCESS_H
 
+#include <list>
 #include <string>
 
 class ChildProcess
@@ -21,7 +22,7 @@ public:
     ~ChildProcess();
 
     void cleanup(bool force_stop = false, int signal = 0);
-    bool exec(const std::string &cmd, const std::string cl_params);
+    bool exec(const std::string &cmd, const std::list<std::string> &cl_params);
 
     int getStdinFd() const {return m_fdStdin;}
     int getStdoutFd() const {return m_fdStdout;}

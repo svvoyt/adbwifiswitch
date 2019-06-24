@@ -110,10 +110,10 @@ bool FilePoller::pollHandlers(std::chrono::milliseconds timeout,
                         timeout = timeout.zero();
                     } else if (timeout != timeout.zero()) {
                         auto diff = std::chrono::duration_cast<decltype(timeout)>( timer - now );
-                        std::cerr << "now " << now.time_since_epoch().count() << " timer "
-                                  << timer.time_since_epoch().count()
-                                  << " diff " << diff.count()
-                                  << " curr timeout " << timeout.count() << std::endl;
+//                        std::cerr << "now " << now.time_since_epoch().count() << " timer "
+//                                  << timer.time_since_epoch().count()
+//                                  << " diff " << diff.count()
+//                                  << " curr timeout " << timeout.count() << std::endl;
                             if (diff < timeout) {
                                 timeout = diff;
                                 use_timer = true;
