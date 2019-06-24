@@ -29,33 +29,36 @@ public class MainActivity extends AppCompatActivity implements CheckSSIDBroadcas
     private static final String WEP_PASSWORD = "WEP";
     private static final String WPA_PASSWORD = "WPA";
 
+    private static final String RUNMODE = "mode";
     private static final String SSID = "ssid";
     private static final String PASSWORD_TYPE = "password_type";
     private static final String PASSWORD = "password";
 
-    private static final String PROXY_HOST = "proxy_host";
-    private static final String PROXY_PORT = "proxy_port";
-    private static final String PROXY_BYPASS = "proxy_bypass";
-    private static final String PROXY_PAC_URI = "proxy_pac_uri";
+    private static final String ConnectSignature = "Mode connect run completed";
+    private static final String DisconnectSignature = "Mode disconnect run completed";
 
     private static final String CLEAR_DEVICE_ADMIN = "clear_device_admin";
+
+    enum RunMode {Connect, Disconnect};
+
+    private RunMode m_runMode = RunMode.Connect;
 
     String mSSID;
     String mPassword;
     String mPasswordType;
-    ProxyInfo mProxyInfo;
 
     CheckSSIDBroadcastReceiver broadcastReceiver;
     WifiManager mWifiManager;
 
     Thread mThread;
 
-    private void printUsage()
+    private void printUsage(final String errmsg)
     {
-        Log.d(TAG, "No datastring provided. use the following adb command:");
+        Log.d(TAG, errmsg + " Use the following adb command:");
         Log.d(TAG,
                 "adb shell am start" +
                 " -n com.steinwurf.adbjoinwifi/.MainActivity " +
+                "-e mode [connect|disconnect]" +
                 "-e ssid SSID " +
                 "-e password_type [WEP|WPA] " +
                 "-e password PASSWORD " +
@@ -70,6 +73,18 @@ public class MainActivity extends AppCompatActivity implements CheckSSIDBroadcas
         Toast.makeText(this, "This application is meant to be used with ADB",
                 Toast.LENGTH_SHORT).show();
         finish();
+    }
+
+    final boolean modeConnect() {
+        return m_runMode == RunMode.Connect;
+    }
+
+    final void notifyConnected() {
+        Log.w(TAG, ConnectSignature + " " + mSSID);
+    }
+
+    final void notifyDisconnected() {
+        Log.w(TAG, DisconnectSignature);
     }
 
     @Override
@@ -96,37 +111,38 @@ public class MainActivity extends AppCompatActivity implements CheckSSIDBroadcas
         mPasswordType = getIntent().getStringExtra(PASSWORD_TYPE);
         mPassword = getIntent().getStringExtra(PASSWORD);
 
-        String proxyHost = getIntent().getStringExtra(PROXY_HOST);
-        String proxyPort = getIntent().getStringExtra(PROXY_PORT);
-        String proxyBypass = getIntent().getStringExtra(PROXY_BYPASS);
-        String proxyPacUri = getIntent().getStringExtra(PROXY_PAC_URI);
+        String mode = getIntent().getStringExtra(RUNMODE);
 
-        // Validate
-        if ((mSSID == null) || // SSID REQUIRED
-            (mPasswordType != null && mPassword == null) || // PASSWORD REQUIRED IF PASSWORD TYPE GIVEN
-            (mPassword != null && mPasswordType == null) || // PASSWORD TYPE REQUIRED IF PASSWORD GIVEN
-            (mPasswordType != null && !mPasswordType.equals(WPA_PASSWORD) && !mPasswordType.equals(WEP_PASSWORD))) // PASSWORD TYPE MUST BE NULL OR WPA OR WEP
-        {
-            printUsage();
-            return;
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            try {
-                mProxyInfo = Proxy.parseProxyInfo(proxyHost, proxyPort, proxyBypass, proxyPacUri);
-            } catch (ParseException e) {
-                Log.d(TAG, "Error parsing proxy settings");
-                printUsage();
+        if (mode != null) {
+            if (mode.equals("connect")) m_runMode = RunMode.Connect;
+            else if (mode.equals("disconnect")) m_runMode = RunMode.Disconnect;
+            else {
+                printUsage("Unknown mode " + mode + ".");
                 return;
             }
         }
 
-        Log.d(TAG, "Trying to join:");
-        Log.d(TAG, "SSID: " + mSSID);
-        if(mPasswordType != null && mPassword != null)
-        {
-            Log.d(TAG, "Password Type: " + mPasswordType);
-            Log.d(TAG, "Password: " + mPassword);
+        // Validate
+        if (modeConnect()) {
+            if ((mSSID == null) || // SSID REQUIRED
+                    (mPasswordType != null && mPassword == null) || // PASSWORD REQUIRED IF PASSWORD TYPE GIVEN
+                    (mPassword != null && mPasswordType == null) || // PASSWORD TYPE REQUIRED IF PASSWORD GIVEN
+                    (mPasswordType != null && !mPasswordType.equals(WPA_PASSWORD) && !mPasswordType.equals(WEP_PASSWORD))) // PASSWORD TYPE MUST BE NULL OR WPA OR WEP
+            {
+                printUsage("Connect mode: no datastring provided.");
+                return;
+            }
+
+            Log.d(TAG, "Trying to join:");
+            Log.d(TAG, "SSID: " + mSSID);
+            if(mPasswordType != null && mPassword != null)
+            {
+                Log.d(TAG, "Password Type: " + mPasswordType);
+                Log.d(TAG, "Password: " + mPassword);
+            }
+
+        } else {
+            mSSID = mPassword = mPasswordType = "";
         }
 
         // Setup layout
@@ -148,6 +164,16 @@ public class MainActivity extends AppCompatActivity implements CheckSSIDBroadcas
         SSIDtextview.setText(mSSID);
         layout.addView(SSIDtextview, params);
 
+        mWifiManager = (WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);
+
+        if (!modeConnect()) {
+            if (mWifiManager.isWifiEnabled())
+                mWifiManager.disconnect();
+            unregisterReceiver( broadcastReceiver );
+            notifyDisconnected();
+            finish();
+        }
+
         // Setup broadcast receiver
 
         broadcastReceiver = new CheckSSIDBroadcastReceiver(mSSID);
@@ -159,12 +185,12 @@ public class MainActivity extends AppCompatActivity implements CheckSSIDBroadcas
         registerReceiver(broadcastReceiver, filter);
 
         // Check if wifi is enabled, and act accordingly
-        mWifiManager = (WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);
 
         if (!mWifiManager.isWifiEnabled())
             mWifiManager.setWifiEnabled(true);
-        else
+        else {
             WifiEnabled();
+        }
     }
 
     @Override
@@ -193,6 +219,7 @@ public class MainActivity extends AppCompatActivity implements CheckSSIDBroadcas
                 Log.e(TAG, "Hit exception", e);
             }
         }
+        notifyConnected();
         finish();
     }
 
@@ -330,14 +357,6 @@ public class MainActivity extends AppCompatActivity implements CheckSSIDBroadcas
             wfc.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.TKIP);
 
             wfc.preSharedKey = "\"".concat(mPassword).concat("\"");
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            try {
-                Proxy.setProxy(wfc, mProxyInfo);
-            } catch (IllegalArgumentException | ReflectiveOperationException e) {
-                Log.e(TAG, "Failed to set proxy on wifi configuration", e);
-            }
         }
     }
 
