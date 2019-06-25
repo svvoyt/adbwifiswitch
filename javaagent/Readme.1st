@@ -2,3 +2,11 @@ Directory adb-join-wifi/ contains slightly modified copy of repository:
 
 https://github.com/steinwurf/adb-join-wifi
 
+- add 2 extra parameters for intent:
+    mode <connect|disconnect>
+    uniq <some uniq value>
+
+  Uniq value is used to find lines in logcat.
+
+- removed proxy support.
+

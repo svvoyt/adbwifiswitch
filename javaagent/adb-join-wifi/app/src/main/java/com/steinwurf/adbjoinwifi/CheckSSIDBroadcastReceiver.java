@@ -10,6 +10,7 @@ import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 
 public class CheckSSIDBroadcastReceiver extends BroadcastReceiver
 {
@@ -66,10 +67,11 @@ public class CheckSSIDBroadcastReceiver extends BroadcastReceiver
                 wifiNetwork = connectionManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
             }
 
-
+//            Log.w("adbjoinwifi", "wifiNetwork " + (wifiNetwork==null ? "null" : wifiNetwork.toString()));
             if (wifiNetwork != null && wifiNetwork.isConnectedOrConnecting())
             {
                 WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+//                Log.w("adbjoinwifi", "wifiNetwork ssid" + wifiInfo.getSSID() + " required " + mSSID);
                 if (wifiInfo.getSSID().equals(mSSID))
                 {
                     if (mSSIDFoundListener != null)

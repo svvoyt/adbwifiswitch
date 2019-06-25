@@ -33,6 +33,7 @@ public class MainActivity extends AppCompatActivity implements CheckSSIDBroadcas
     private static final String SSID = "ssid";
     private static final String PASSWORD_TYPE = "password_type";
     private static final String PASSWORD = "password";
+    private static final String UNIQPARAM = "uniq";
 
     private static final String ConnectSignature = "Mode connect run completed";
     private static final String DisconnectSignature = "Mode disconnect run completed";
@@ -46,6 +47,7 @@ public class MainActivity extends AppCompatActivity implements CheckSSIDBroadcas
     String mSSID;
     String mPassword;
     String mPasswordType;
+    String mUniqTag;
 
     CheckSSIDBroadcastReceiver broadcastReceiver;
     WifiManager mWifiManager;
@@ -59,6 +61,7 @@ public class MainActivity extends AppCompatActivity implements CheckSSIDBroadcas
                 "adb shell am start" +
                 " -n com.steinwurf.adbjoinwifi/.MainActivity " +
                 "-e mode [connect|disconnect]" +
+                "-e uniq <uniq tag>" +
                 "-e ssid SSID " +
                 "-e password_type [WEP|WPA] " +
                 "-e password PASSWORD " +
@@ -80,11 +83,11 @@ public class MainActivity extends AppCompatActivity implements CheckSSIDBroadcas
     }
 
     final void notifyConnected() {
-        Log.w(TAG, ConnectSignature + " " + mSSID);
+        Log.w(TAG, mUniqTag + " " + ConnectSignature + " " + mSSID);
     }
 
     final void notifyDisconnected() {
-        Log.w(TAG, DisconnectSignature);
+        Log.w(TAG, mUniqTag + " " + DisconnectSignature);
     }
 
     @Override
@@ -110,8 +113,10 @@ public class MainActivity extends AppCompatActivity implements CheckSSIDBroadcas
         mSSID = getIntent().getStringExtra(SSID);
         mPasswordType = getIntent().getStringExtra(PASSWORD_TYPE);
         mPassword = getIntent().getStringExtra(PASSWORD);
+        mUniqTag = getIntent().getStringExtra(UNIQPARAM);
 
-        String mode = getIntent().getStringExtra(RUNMODE);
+        final String mode = getIntent().getStringExtra(RUNMODE);
+
 
         if (mode != null) {
             if (mode.equals("connect")) m_runMode = RunMode.Connect;
@@ -167,11 +172,13 @@ public class MainActivity extends AppCompatActivity implements CheckSSIDBroadcas
         mWifiManager = (WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);
 
         if (!modeConnect()) {
-            if (mWifiManager.isWifiEnabled())
+            if (mWifiManager.isWifiEnabled()) {
                 mWifiManager.disconnect();
-            unregisterReceiver( broadcastReceiver );
+                mWifiManager.setWifiEnabled( false );
+            }
             notifyDisconnected();
             finish();
+            return;
         }
 
         // Setup broadcast receiver
