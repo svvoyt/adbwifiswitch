@@ -64,13 +64,7 @@ public class MainActivity extends AppCompatActivity implements CheckSSIDBroadcas
                 "-e uniq <uniq tag>" +
                 "-e ssid SSID " +
                 "-e password_type [WEP|WPA] " +
-                "-e password PASSWORD " +
-                "\nOptional proxy args:\n" +
-                "    -e proxy_host HOSTNAME " +
-                "-e proxy_port PORT " +
-                "[-e proxy_bypass COMMA,SEPARATED,LIST]\n" +
-                "    OR\n" +
-                "    -e proxy_pac_uri http://my.proxy.config/url\n" +
+                "-e password PASSWORD\n" +
                 "If app was granted device owner using dpm, you can unset it with:\n" +
                 "    -e clear_device_admin true");
         Toast.makeText(this, "This application is meant to be used with ADB",
