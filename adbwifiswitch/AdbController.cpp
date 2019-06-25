@@ -27,6 +27,7 @@ public:
             case TaskDef::RunConnect:
                 return std::make_shared<AdbTaskRunConnect>( ctx() );
             case TaskDef::WaitConnectLog:
+                return std::make_shared<AdbTaskWaitConnectLog>( ctx() );
             default:
                 assert(false);
         }
@@ -59,6 +60,7 @@ public:
             case TaskDef::RunDisconnect:
                 return std::make_shared<AdbTaskRunDisconnect>( ctx() );
             case TaskDef::WaitDisconnectLog:
+                return std::make_shared<AdbTaskWaitDisconnectLog>( ctx() );
             default:
                 assert(false);
         }
@@ -123,10 +125,13 @@ void AdbController::cleanup()
     m_currTask.reset();
     m_script.reset();
 
+    cleanupChildProc();
+}
+
+void AdbController::cleanupChildProc()
+{
     foreachFh( [&](AdbController::FHCommon *fptr) { fptr->setState( false ); } );
 
-    m_adbProc.cleanup();
-    
     foreachFh( [&](AdbController::FHCommon *fptr) {
         if (fptr->handlerId != FilePoller::BadHandlerId)
             m_fpoll.removeHandler( fptr->handlerId );
@@ -135,6 +140,8 @@ void AdbController::cleanup()
     m_adbStdin.reset();
     m_adbStdout.reset();
     m_adbStderr.reset();
+
+    m_adbProc.cleanup(true);
 }
 
 inline void AdbController::foreachFh(std::function<void(AdbController::FHCommon *)> proc)
@@ -223,6 +230,9 @@ bool AdbController::switchTask(AdbTask::Res res)
             cleanup();
             return false;
         }
+    } else {
+        LOGI(true, "Execution done");
+        cleanup();
     }
     
     return true;
@@ -239,8 +249,8 @@ AdbController::FHCommon::FHCommon(AdbController &owner, int fd)
 
 bool AdbController::FHCommon::onError()
 {
-    LOG(true, "onError() fs:%d", static_cast<int>(getFH()));
-    return m_owner.switchTask( AdbTask::Res::Fail );
+    // LOG(true, "onError() fs:%d", static_cast<int>(getFH()));
+    return m_owner.switchTask( m_owner.m_currTask->onError( getFH() ) );
 }
 
 bool AdbController::FHCommon::onReadyToRead()
@@ -376,6 +386,11 @@ AdbController::Context::Context(AdbController &owner, std::shared_ptr<Config> cf
 bool AdbController::Context::startAdb(const std::list<std::string> &cl)
 {
     return m_owner.initAdb( cl );
+}
+
+void AdbController::Context::stopAdb()
+{
+    return m_owner.cleanupChildProc();
 }
 
 bool AdbController::Context::writeStdIn(const void *buf, std::size_t size)

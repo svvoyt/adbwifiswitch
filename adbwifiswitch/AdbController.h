@@ -88,7 +88,8 @@ private:
     public:
         Context(AdbController &owner, std::shared_ptr<Config> cfg);
 
-        virtual bool startAdb(const std::list<std::string> &cl) override;        
+        virtual bool startAdb(const std::list<std::string> &cl) override;
+        virtual void stopAdb() override;
         virtual bool writeStdIn(const void *buf, std::size_t size) override;
         virtual bool timerCtl(FStream fstream, unsigned int timerId, bool start,
                               std::chrono::milliseconds ms=std::chrono::milliseconds::zero()) override;
@@ -97,6 +98,7 @@ private:
     };
     
     void cleanup();
+    void cleanupChildProc();
     void foreachFh( std::function<void(FHCommon *)> proc );
     FileHandler *getFH(AdbContext::FStream fstream);
     bool initAdb(const std::list<std::string> &cl_params);

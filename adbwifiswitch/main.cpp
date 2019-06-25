@@ -45,7 +45,7 @@ void usage(char *pname)
                     " -a|--adbcmd=<adb command>, default is \"adb\"\n"
                     " -h|--help - print usage\n"
                     " -t|--type <%s>, default is WPA\n"
-                    " -v|--verbose - noisy logging", cpname, cpname, ss.str().c_str());
+                    " -v|--verbose - noisy logging\n", cpname, cpname, ss.str().c_str());
 }
 
 __attribute__((__format__ (__printf__, 2, 3)))
@@ -78,7 +78,7 @@ bool parseClArgs(int argc, char** argv, Config &cfg, RunMode &rmode)
 
     Config::Builder builder;
     builder.setAdbCmd( AdbCmdDefault );
-    builder.setAuthType( AuthTypes[0] );
+    builder.setAuthType( AuthTypes[1] );
 
     while (1) {
         int option_index = 0;
@@ -160,6 +160,8 @@ bool parseClArgs(int argc, char** argv, Config &cfg, RunMode &rmode)
         }
     }
 
+    LOGD(true, "Config:\n%s", cfg.to_string().c_str());
+    
     if (hflag) {
         usage(*argv);
         if (rmode == RunMode::None) rmode = RunMode::Help;

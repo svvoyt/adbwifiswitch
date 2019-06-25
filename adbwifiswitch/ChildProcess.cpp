@@ -104,8 +104,12 @@ bool ChildProcess::exec(const std::string &cmd, const std::list<std::string> &cl
         std::vector<char *> argvref;
         std::vector<std::vector<char> > argv;
         argv.emplace_back( std::vector<char>( cmd.begin(), cmd.end() ) );
+        argv.back().push_back(0);
         std::size_t i = 1;
-        for(auto &str : cl_params) argv.emplace_back( std::vector<char>( str.begin(), str.end() ) );
+        for(auto &str : cl_params) {
+            argv.emplace_back( std::vector<char>( str.begin(), str.end() ) );
+            argv.back().push_back(0);
+        }
         for(auto &v : argv) argvref.push_back( v.data() );
         argvref.push_back( nullptr );
         

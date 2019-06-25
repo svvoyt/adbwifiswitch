@@ -23,6 +23,7 @@ public:
     std::shared_ptr<Config> configShared() {return m_config;}
     
     virtual bool startAdb(const std::list<std::string> &cl) = 0;
+    virtual void stopAdb() = 0;
     virtual bool writeStdIn(const void *buf, std::size_t size) = 0;
     virtual bool timerCtl(FStream fstream, unsigned int timerId, bool start,
                           std::chrono::milliseconds ms=std::chrono::milliseconds::zero()) = 0;

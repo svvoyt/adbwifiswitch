@@ -8,6 +8,7 @@ struct ConfigData {
     std::string authType;
     std::string password;
     std::string ssid;
+    std::string uniqTag;
 };
 
 class Config : ConfigData {
@@ -26,6 +27,9 @@ public:
     const std::string &getAuthType() const {return authType;}
     const std::string &getPassword() const {return password;}
     const std::string &getSsid() const {return ssid;}
+    const std::string &getUniqTag() const {return uniqTag;}
+    
+    std::string to_string() const;
 };
 
 #endif // CONFIG_H
